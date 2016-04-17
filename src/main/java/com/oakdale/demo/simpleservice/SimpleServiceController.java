@@ -29,7 +29,8 @@ public class SimpleServiceController {
     private final Map<Long, JobStatus> completedJobs = new ConcurrentHashMap<>();
 
     @RequestMapping(path = "/submit", method = RequestMethod.GET)
-    public @ResponseBody JobStatus submitRequest(@RequestParam(value="name", required=false, defaultValue="anonymous") String name) {
+    public @ResponseBody JobStatus submitRequest(@RequestParam(value="name", required=false, defaultValue="anonymous") String name,
+                                                 @RequestParam(value="throw", required=false, defaultValue="null") String exception) {
 
         JobStatus status = new JobStatus(counter.incrementAndGet(), JobStatus.Status.Requested, name);
         this.completedJobs.put(status.getId(), status);
@@ -37,8 +38,13 @@ public class SimpleServiceController {
         CompletableFuture.supplyAsync(() -> {
             this.log.info("Submitted job to run on thread [{}] with id [{}] from [{}]", Thread.currentThread().getName(), status.getId(), status.getOriginator());
             try {
-                TimeUnit.SECONDS.sleep(3L);
+                TimeUnit.SECONDS.sleep(5L);
             } catch (InterruptedException e) {}
+
+            if(!"null".equals(exception)) {
+                throw new RuntimeException(exception); // error in processing
+            }
+
             status.setResults(String.format("Results from job completed on thread [{%s}]", Thread.currentThread().getName()));
             return status;
         }, this.pool)
@@ -61,7 +67,7 @@ public class SimpleServiceController {
     }
 
     @RequestMapping(path = "/get", method = RequestMethod.GET)
-    public @ResponseBody JobStatus getRequest(@RequestParam(value="id", required=true) String id) {
+    public @ResponseBody JobStatus getRequest(@RequestParam(value="id", required=true, defaultValue = "0") String id) {
         return this.completedJobs.get(Long.decode(id));
     }
 
